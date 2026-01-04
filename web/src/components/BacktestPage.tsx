@@ -43,6 +43,7 @@ import { useLanguage } from '../contexts/LanguageContext'
 import { t } from '../i18n/translations'
 import { confirmToast } from '../lib/notify'
 import { DecisionCard } from './DecisionCard'
+import { MetricTooltip } from './MetricTooltip'
 import type {
   BacktestStatusPayload,
   BacktestPositionStatus,
@@ -79,6 +80,8 @@ function StatCard({
   suffix,
   trend,
   color = '#EAECEF',
+  metricKey,
+  language = 'en',
 }: {
   icon: typeof TrendingUp
   label: string
@@ -86,6 +89,8 @@ function StatCard({
   suffix?: string
   trend?: 'up' | 'down' | 'neutral'
   color?: string
+  metricKey?: string
+  language?: string
 }) {
   const trendColors = {
     up: '#0ECB81',
@@ -103,6 +108,9 @@ function StatCard({
         <span className="text-xs" style={{ color: '#848E9C' }}>
           {label}
         </span>
+        {metricKey && (
+          <MetricTooltip metricKey={metricKey} language={language} size={12} />
+        )}
       </div>
       <div className="flex items-baseline gap-1">
         <span className="text-xl font-bold" style={{ color }}>
@@ -824,17 +832,17 @@ export function BacktestPage() {
     if (!coinSource) return false
 
     // Check explicit source_type
-    if (coinSource.source_type === 'coinpool' || coinSource.source_type === 'oi_top') {
+    if (coinSource.source_type === 'ai500' || coinSource.source_type === 'oi_top') {
       return true
     }
-    if (coinSource.source_type === 'mixed' && (coinSource.use_coin_pool || coinSource.use_oi_top)) {
+    if (coinSource.source_type === 'mixed' && (coinSource.use_ai500 || coinSource.use_oi_top)) {
       return true
     }
 
     // Also check flags for backward compatibility (when source_type is empty or not set)
     const srcType = coinSource.source_type as string
     if (!srcType) {
-      if (coinSource.use_coin_pool || coinSource.use_oi_top) {
+      if (coinSource.use_ai500 || coinSource.use_oi_top) {
         return true
       }
     }
@@ -850,10 +858,10 @@ export function BacktestPage() {
     // Infer source_type from flags if empty (backward compatibility)
     let sourceType = cs.source_type as string
     if (!sourceType) {
-      if (cs.use_coin_pool && cs.use_oi_top) {
+      if (cs.use_ai500 && cs.use_oi_top) {
         sourceType = 'mixed'
-      } else if (cs.use_coin_pool) {
-        sourceType = 'coinpool'
+      } else if (cs.use_ai500) {
+        sourceType = 'ai500'
       } else if (cs.use_oi_top) {
         sourceType = 'oi_top'
       } else if (cs.static_coins?.length) {
@@ -862,13 +870,13 @@ export function BacktestPage() {
     }
 
     switch (sourceType) {
-      case 'coinpool':
-        return { type: 'AI500', limit: cs.coin_pool_limit || 30 }
+      case 'ai500':
+        return { type: 'AI500', limit: cs.ai500_limit || 30 }
       case 'oi_top':
         return { type: 'OI Top', limit: cs.oi_top_limit || 30 }
       case 'mixed':
         const sources = []
-        if (cs.use_coin_pool) sources.push(`AI500(${cs.coin_pool_limit || 30})`)
+        if (cs.use_ai500) sources.push(`AI500(${cs.ai500_limit || 30})`)
         if (cs.use_oi_top) sources.push(`OI Top(${cs.oi_top_limit || 30})`)
         if (cs.static_coins?.length) sources.push(`Static(${cs.static_coins.length})`)
         return { type: 'Mixed', desc: sources.join(' + ') }
@@ -1779,6 +1787,7 @@ export function BacktestPage() {
                   label={language === 'zh' ? '当前净值' : 'Equity'}
                   value={(status?.equity ?? 0).toFixed(2)}
                   suffix="USDT"
+                  language={language}
                 />
                 <StatCard
                   icon={TrendingUp}
@@ -1786,17 +1795,23 @@ export function BacktestPage() {
                   value={`${(metrics?.total_return_pct ?? 0).toFixed(2)}%`}
                   trend={(metrics?.total_return_pct ?? 0) >= 0 ? 'up' : 'down'}
                   color={(metrics?.total_return_pct ?? 0) >= 0 ? '#0ECB81' : '#F6465D'}
+                  metricKey="total_return"
+                  language={language}
                 />
                 <StatCard
                   icon={AlertTriangle}
                   label={language === 'zh' ? '最大回撤' : 'Max DD'}
                   value={`${(metrics?.max_drawdown_pct ?? 0).toFixed(2)}%`}
                   color="#F6465D"
+                  metricKey="max_drawdown"
+                  language={language}
                 />
                 <StatCard
                   icon={BarChart3}
                   label={language === 'zh' ? '夏普比率' : 'Sharpe'}
                   value={(metrics?.sharpe_ratio ?? 0).toFixed(2)}
+                  metricKey="sharpe_ratio"
+                  language={language}
                 />
               </div>
 
@@ -1856,16 +1871,18 @@ export function BacktestPage() {
                         {metrics && (
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
                             <div className="p-3 rounded-lg" style={{ background: '#1E2329' }}>
-                              <div className="text-xs" style={{ color: '#848E9C' }}>
+                              <div className="flex items-center gap-1 text-xs" style={{ color: '#848E9C' }}>
                                 {language === 'zh' ? '胜率' : 'Win Rate'}
+                                <MetricTooltip metricKey="win_rate" language={language} size={11} />
                               </div>
                               <div className="text-lg font-bold" style={{ color: '#EAECEF' }}>
                                 {(metrics.win_rate ?? 0).toFixed(1)}%
                               </div>
                             </div>
                             <div className="p-3 rounded-lg" style={{ background: '#1E2329' }}>
-                              <div className="text-xs" style={{ color: '#848E9C' }}>
+                              <div className="flex items-center gap-1 text-xs" style={{ color: '#848E9C' }}>
                                 {language === 'zh' ? '盈亏因子' : 'Profit Factor'}
+                                <MetricTooltip metricKey="profit_factor" language={language} size={11} />
                               </div>
                               <div className="text-lg font-bold" style={{ color: '#EAECEF' }}>
                                 {(metrics.profit_factor ?? 0).toFixed(2)}
