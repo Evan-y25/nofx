@@ -6,9 +6,11 @@ import { DecisionCard } from '../components/DecisionCard'
 import { PositionHistory } from '../components/PositionHistory'
 import { PunkAvatar, getTraderAvatar } from '../components/PunkAvatar'
 import { confirmToast, notify } from '../lib/notify'
+import { formatPrice, formatQuantity } from '../utils/format'
 import { t, type Language } from '../i18n/translations'
 import { LogOut, Loader2, Eye, EyeOff, Copy, Check } from 'lucide-react'
 import { DeepVoidBackground } from '../components/DeepVoidBackground'
+import { GridRiskPanel } from '../components/strategy/GridRiskPanel'
 import type {
     SystemStatus,
     AccountInfo,
@@ -150,6 +152,13 @@ export function TraderDashboardPage({
     useEffect(() => {
         setPositionsCurrentPage(1)
     }, [selectedTraderId, positionsPageSize])
+
+    // Auto-set chart symbol for grid trading
+    useEffect(() => {
+        if (status?.strategy_type === 'grid_trading' && status?.grid_symbol) {
+            setSelectedChartSymbol(status.grid_symbol)
+        }
+    }, [status?.strategy_type, status?.grid_symbol])
 
     // Get current exchange info for perp-dex wallet display
     const currentExchange = exchanges?.find(
@@ -361,7 +370,7 @@ export function TraderDashboardPage({
                                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-nofx-green rounded-full border-2 border-[#0B0E11] shadow-[0_0_8px_rgba(14,203,129,0.8)] animate-pulse" />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-3xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-nofx-text-main to-nofx-text-muted">
+                                <span className="text-3xl tracking-tight text-nofx-text font-semibold">
                                     {selectedTrader.trader_name}
                                 </span>
                                 <span className="text-xs font-mono text-nofx-text-muted opacity-60 flex items-center gap-2">
@@ -458,7 +467,7 @@ export function TraderDashboardPage({
                                 )}
                             </span>
                         </span>
-                        <span className="w-px h-3 bg-white/10" />
+                        <span className="w-px h-3 bg-white/10 hidden md:block" />
                         <span className="flex items-center gap-2">
                             <span className="opacity-60">Exchange:</span>
                             <span className="text-nofx-text-main font-semibold">
@@ -468,7 +477,7 @@ export function TraderDashboardPage({
                                 )}
                             </span>
                         </span>
-                        <span className="w-px h-3 bg-white/10" />
+                        <span className="w-px h-3 bg-white/10 hidden md:block" />
                         <span className="flex items-center gap-2">
                             <span className="opacity-60">Strategy:</span>
                             <span className="text-nofx-gold font-semibold tracking-wide">
@@ -476,12 +485,12 @@ export function TraderDashboardPage({
                             </span>
                         </span>
                         {status && (
-                            <>
+                            <div className="hidden md:contents">
                                 <span className="w-px h-3 bg-white/10" />
                                 <span>Cycles: <span className="text-nofx-text-main">{status.call_count}</span></span>
                                 <span className="w-px h-3 bg-white/10" />
                                 <span>Runtime: <span className="text-nofx-text-main">{status.runtime_minutes} min</span></span>
-                            </>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -499,7 +508,7 @@ export function TraderDashboardPage({
                 )}
 
                 {/* Account Overview */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <StatCard
                         title={t('totalEquity', language)}
                         value={`${account?.total_equity?.toFixed(2) || '0.00'}`}
@@ -531,6 +540,17 @@ export function TraderDashboardPage({
                         icon="📊"
                     />
                 </div>
+
+                {/* Grid Risk Panel - Only show for grid trading strategy */}
+                {status?.strategy_type === 'grid_trading' && selectedTraderId && (
+                    <div className="mb-8 animate-slide-in" style={{ animationDelay: '0.05s' }}>
+                        <GridRiskPanel
+                            traderId={selectedTraderId}
+                            language={language}
+                            refreshInterval={5000}
+                        />
+                    </div>
+                )}
 
                 {/* Main Content Area */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -580,13 +600,13 @@ export function TraderDashboardPage({
                                                     <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-left">{t('symbol', language)}</th>
                                                     <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-center">{t('side', language)}</th>
                                                     <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-center">{language === 'zh' ? '操作' : 'Action'}</th>
-                                                    <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-right" title={t('entryPrice', language)}>{language === 'zh' ? '入场价' : 'Entry'}</th>
-                                                    <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-right" title={t('markPrice', language)}>{language === 'zh' ? '标记价' : 'Mark'}</th>
+                                                    <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-right hidden md:table-cell" title={t('entryPrice', language)}>{language === 'zh' ? '入场价' : 'Entry'}</th>
+                                                    <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-right hidden md:table-cell" title={t('markPrice', language)}>{language === 'zh' ? '标记价' : 'Mark'}</th>
                                                     <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-right" title={t('quantity', language)}>{language === 'zh' ? '数量' : 'Qty'}</th>
-                                                    <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-right" title={t('positionValue', language)}>{language === 'zh' ? '价值' : 'Value'}</th>
-                                                    <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-center" title={t('leverage', language)}>{language === 'zh' ? '杠杆' : 'Lev.'}</th>
+                                                    <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-right hidden md:table-cell" title={t('positionValue', language)}>{language === 'zh' ? '价值' : 'Value'}</th>
+                                                    <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-center hidden md:table-cell" title={t('leverage', language)}>{language === 'zh' ? '杠杆' : 'Lev.'}</th>
                                                     <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-right" title={t('unrealizedPnL', language)}>{language === 'zh' ? '未实现盈亏' : 'uPnL'}</th>
-                                                    <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-right" title={t('liqPrice', language)}>{language === 'zh' ? '强平价' : 'Liq.'}</th>
+                                                    <th className="px-1 pb-3 font-semibold text-nofx-text-muted whitespace-nowrap text-right hidden md:table-cell" title={t('liqPrice', language)}>{language === 'zh' ? '强平价' : 'Liq.'}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -634,11 +654,11 @@ export function TraderDashboardPage({
                                                                 {language === 'zh' ? '平仓' : 'Close'}
                                                             </button>
                                                         </td>
-                                                        <td className="px-1 py-3 font-mono whitespace-nowrap text-right text-nofx-text-main">{pos.entry_price.toFixed(4)}</td>
-                                                        <td className="px-1 py-3 font-mono whitespace-nowrap text-right text-nofx-text-main">{pos.mark_price.toFixed(4)}</td>
-                                                        <td className="px-1 py-3 font-mono whitespace-nowrap text-right text-nofx-text-main">{pos.quantity.toFixed(4)}</td>
-                                                        <td className="px-1 py-3 font-mono font-bold whitespace-nowrap text-right text-nofx-text-main">{(pos.quantity * pos.mark_price).toFixed(2)}</td>
-                                                        <td className="px-1 py-3 font-mono whitespace-nowrap text-center text-nofx-gold">{pos.leverage}x</td>
+                                                        <td className="px-1 py-3 font-mono whitespace-nowrap text-right text-nofx-text-main hidden md:table-cell">{formatPrice(pos.entry_price)}</td>
+                                                        <td className="px-1 py-3 font-mono whitespace-nowrap text-right text-nofx-text-main hidden md:table-cell">{formatPrice(pos.mark_price)}</td>
+                                                        <td className="px-1 py-3 font-mono whitespace-nowrap text-right text-nofx-text-main">{formatQuantity(pos.quantity)}</td>
+                                                        <td className="px-1 py-3 font-mono font-bold whitespace-nowrap text-right text-nofx-text-main hidden md:table-cell">{(pos.quantity * pos.mark_price).toFixed(2)}</td>
+                                                        <td className="px-1 py-3 font-mono whitespace-nowrap text-center text-nofx-gold hidden md:table-cell">{pos.leverage}x</td>
                                                         <td className="px-1 py-3 font-mono whitespace-nowrap text-right">
                                                             <span
                                                                 className={`font-bold ${pos.unrealized_pnl >= 0 ? 'text-nofx-green shadow-nofx-green' : 'text-nofx-red shadow-nofx-red'}`}
@@ -648,7 +668,7 @@ export function TraderDashboardPage({
                                                                 {pos.unrealized_pnl.toFixed(2)}
                                                             </span>
                                                         </td>
-                                                        <td className="px-1 py-3 font-mono whitespace-nowrap text-right text-nofx-text-muted">{pos.liquidation_price.toFixed(4)}</td>
+                                                        <td className="px-1 py-3 font-mono whitespace-nowrap text-right text-nofx-text-muted hidden md:table-cell">{formatPrice(pos.liquidation_price)}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>

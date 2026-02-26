@@ -20,6 +20,15 @@ import (
 	"nofx/provider/twelvedata"
 	"nofx/store"
 	"nofx/trader"
+	"nofx/trader/aster"
+	"nofx/trader/binance"
+	"nofx/trader/bitget"
+	"nofx/trader/bybit"
+	"nofx/trader/gate"
+	hyperliquidtrader "nofx/trader/hyperliquid"
+	"nofx/trader/kucoin"
+	"nofx/trader/lighter"
+	"nofx/trader/okx"
 	"strconv"
 	"strings"
 	"time"
@@ -157,6 +166,7 @@ func (s *Server) setupRoutes() {
 			protected.POST("/traders/:id/sync-balance", s.handleSyncBalance)
 			protected.POST("/traders/:id/close-position", s.handleClosePosition)
 			protected.PUT("/traders/:id/competition", s.handleToggleCompetition)
+			protected.GET("/traders/:id/grid-risk", s.handleGetGridRiskInfo)
 
 			// AI model configuration
 			protected.GET("/models", s.handleGetModelConfigs)
@@ -202,6 +212,7 @@ func (s *Server) setupRoutes() {
 			protected.GET("/trades", s.handleTrades)
 			protected.GET("/orders", s.handleOrders)               // Order list (all orders)
 			protected.GET("/orders/:id/fills", s.handleOrderFills) // Order fill details
+			protected.GET("/open-orders", s.handleOpenOrders)      // Open orders from exchange (pending SL/TP)
 			protected.GET("/decisions", s.handleDecisions)
 			protected.GET("/decisions/latest", s.handleLatestDecisions)
 			protected.GET("/statistics", s.handleStatistics)
@@ -254,13 +265,14 @@ func (s *Server) handleGetServerIP(c *gin.Context) {
 	})
 }
 
-// getPublicIPFromAPI Get public IP via third-party API
+// getPublicIPFromAPI Get public IP via third-party API (IPv4 only)
 func getPublicIPFromAPI() string {
-	// Try multiple public IP query services
+	// Try multiple public IP query services (IPv4-only endpoints)
 	services := []string{
-		"https://api.ipify.org?format=text",
-		"https://icanhazip.com",
-		"https://ifconfig.me",
+		"https://api4.ipify.org?format=text", // IPv4 only
+		"https://ipv4.icanhazip.com",         // IPv4 only
+		"https://v4.ident.me",                // IPv4 only
+		"https://api.ipify.org?format=text",  // May return IPv4 or IPv6
 	}
 
 	client := &http.Client{
@@ -282,8 +294,9 @@ func getPublicIPFromAPI() string {
 			}
 
 			ip := strings.TrimSpace(string(body[:n]))
-			// Verify if it's a valid IP address
-			if net.ParseIP(ip) != nil {
+			parsedIP := net.ParseIP(ip)
+			// Verify if it's a valid IPv4 address (not containing ":")
+			if parsedIP != nil && parsedIP.To4() != nil {
 				return ip
 			}
 		}
@@ -471,6 +484,7 @@ type UpdateExchangeConfigRequest struct {
 		Passphrase              string `json:"passphrase"` // OKX specific
 		Testnet                 bool   `json:"testnet"`
 		HyperliquidWalletAddr   string `json:"hyperliquid_wallet_addr"`
+		HyperliquidUnifiedAcct  bool   `json:"hyperliquid_unified_account"` // Unified Account mode
 		AsterUser               string `json:"aster_user"`
 		AsterSigner             string `json:"aster_signer"`
 		AsterPrivateKey         string `json:"aster_private_key"`
@@ -581,32 +595,44 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 		// Convert EncryptedString fields to string
 		switch exchangeCfg.ExchangeType {
 		case "binance":
-			tempTrader = trader.NewFuturesTrader(string(exchangeCfg.APIKey), string(exchangeCfg.SecretKey), userID)
+			tempTrader = binance.NewFuturesTrader(string(exchangeCfg.APIKey), string(exchangeCfg.SecretKey), userID)
 		case "hyperliquid":
-			tempTrader, createErr = trader.NewHyperliquidTrader(
+			tempTrader, createErr = hyperliquidtrader.NewHyperliquidTrader(
 				string(exchangeCfg.APIKey), // private key
 				exchangeCfg.HyperliquidWalletAddr,
 				exchangeCfg.Testnet,
+				exchangeCfg.HyperliquidUnifiedAcct,
 			)
 		case "aster":
-			tempTrader, createErr = trader.NewAsterTrader(
+			tempTrader, createErr = aster.NewAsterTrader(
 				exchangeCfg.AsterUser,
 				exchangeCfg.AsterSigner,
 				string(exchangeCfg.AsterPrivateKey),
 			)
 		case "bybit":
-			tempTrader = trader.NewBybitTrader(
+			tempTrader = bybit.NewBybitTrader(
 				string(exchangeCfg.APIKey),
 				string(exchangeCfg.SecretKey),
 			)
 		case "okx":
-			tempTrader = trader.NewOKXTrader(
+			tempTrader = okx.NewOKXTrader(
 				string(exchangeCfg.APIKey),
 				string(exchangeCfg.SecretKey),
 				string(exchangeCfg.Passphrase),
 			)
 		case "bitget":
-			tempTrader = trader.NewBitgetTrader(
+			tempTrader = bitget.NewBitgetTrader(
+				string(exchangeCfg.APIKey),
+				string(exchangeCfg.SecretKey),
+				string(exchangeCfg.Passphrase),
+			)
+		case "gate":
+			tempTrader = gate.NewGateTrader(
+				string(exchangeCfg.APIKey),
+				string(exchangeCfg.SecretKey),
+			)
+		case "kucoin":
+			tempTrader = kucoin.NewKuCoinTrader(
 				string(exchangeCfg.APIKey),
 				string(exchangeCfg.SecretKey),
 				string(exchangeCfg.Passphrase),
@@ -614,7 +640,7 @@ func (s *Server) handleCreateTrader(c *gin.Context) {
 		case "lighter":
 			if exchangeCfg.LighterWalletAddr != "" && string(exchangeCfg.LighterAPIKeyPrivateKey) != "" {
 				// Lighter only supports mainnet
-				tempTrader, createErr = trader.NewLighterTraderV2(
+				tempTrader, createErr = lighter.NewLighterTraderV2(
 					exchangeCfg.LighterWalletAddr,
 					string(exchangeCfg.LighterAPIKeyPrivateKey),
 					exchangeCfg.LighterAPIKeyIndex,
@@ -1095,6 +1121,20 @@ func (s *Server) handleToggleCompetition(c *gin.Context) {
 	})
 }
 
+// handleGetGridRiskInfo returns current risk information for a grid trader
+func (s *Server) handleGetGridRiskInfo(c *gin.Context) {
+	traderID := c.Param("id")
+
+	autoTrader, err := s.traderManager.GetTrader(traderID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "trader not found"})
+		return
+	}
+
+	riskInfo := autoTrader.GetGridRiskInfo()
+	c.JSON(http.StatusOK, riskInfo)
+}
+
 // handleSyncBalance Sync exchange balance to initial_balance (Option B: Manual Sync + Option C: Smart Detection)
 func (s *Server) handleSyncBalance(c *gin.Context) {
 	userID := c.GetString("user_id")
@@ -1125,32 +1165,44 @@ func (s *Server) handleSyncBalance(c *gin.Context) {
 	// Convert EncryptedString fields to string
 	switch exchangeCfg.ExchangeType {
 	case "binance":
-		tempTrader = trader.NewFuturesTrader(string(exchangeCfg.APIKey), string(exchangeCfg.SecretKey), userID)
+		tempTrader = binance.NewFuturesTrader(string(exchangeCfg.APIKey), string(exchangeCfg.SecretKey), userID)
 	case "hyperliquid":
-		tempTrader, createErr = trader.NewHyperliquidTrader(
+		tempTrader, createErr = hyperliquidtrader.NewHyperliquidTrader(
 			string(exchangeCfg.APIKey),
 			exchangeCfg.HyperliquidWalletAddr,
 			exchangeCfg.Testnet,
+			exchangeCfg.HyperliquidUnifiedAcct,
 		)
 	case "aster":
-		tempTrader, createErr = trader.NewAsterTrader(
+		tempTrader, createErr = aster.NewAsterTrader(
 			exchangeCfg.AsterUser,
 			exchangeCfg.AsterSigner,
 			string(exchangeCfg.AsterPrivateKey),
 		)
 	case "bybit":
-		tempTrader = trader.NewBybitTrader(
+		tempTrader = bybit.NewBybitTrader(
 			string(exchangeCfg.APIKey),
 			string(exchangeCfg.SecretKey),
 		)
 	case "okx":
-		tempTrader = trader.NewOKXTrader(
+		tempTrader = okx.NewOKXTrader(
 			string(exchangeCfg.APIKey),
 			string(exchangeCfg.SecretKey),
 			string(exchangeCfg.Passphrase),
 		)
 	case "bitget":
-		tempTrader = trader.NewBitgetTrader(
+		tempTrader = bitget.NewBitgetTrader(
+			string(exchangeCfg.APIKey),
+			string(exchangeCfg.SecretKey),
+			string(exchangeCfg.Passphrase),
+		)
+	case "gate":
+		tempTrader = gate.NewGateTrader(
+			string(exchangeCfg.APIKey),
+			string(exchangeCfg.SecretKey),
+		)
+	case "kucoin":
+		tempTrader = kucoin.NewKuCoinTrader(
 			string(exchangeCfg.APIKey),
 			string(exchangeCfg.SecretKey),
 			string(exchangeCfg.Passphrase),
@@ -1158,7 +1210,7 @@ func (s *Server) handleSyncBalance(c *gin.Context) {
 	case "lighter":
 		if exchangeCfg.LighterWalletAddr != "" && string(exchangeCfg.LighterAPIKeyPrivateKey) != "" {
 			// Lighter only supports mainnet
-			tempTrader, createErr = trader.NewLighterTraderV2(
+			tempTrader, createErr = lighter.NewLighterTraderV2(
 				exchangeCfg.LighterWalletAddr,
 				string(exchangeCfg.LighterAPIKeyPrivateKey),
 				exchangeCfg.LighterAPIKeyIndex,
@@ -1277,32 +1329,44 @@ func (s *Server) handleClosePosition(c *gin.Context) {
 	// Convert EncryptedString fields to string
 	switch exchangeCfg.ExchangeType {
 	case "binance":
-		tempTrader = trader.NewFuturesTrader(string(exchangeCfg.APIKey), string(exchangeCfg.SecretKey), userID)
+		tempTrader = binance.NewFuturesTrader(string(exchangeCfg.APIKey), string(exchangeCfg.SecretKey), userID)
 	case "hyperliquid":
-		tempTrader, createErr = trader.NewHyperliquidTrader(
+		tempTrader, createErr = hyperliquidtrader.NewHyperliquidTrader(
 			string(exchangeCfg.APIKey),
 			exchangeCfg.HyperliquidWalletAddr,
 			exchangeCfg.Testnet,
+			exchangeCfg.HyperliquidUnifiedAcct,
 		)
 	case "aster":
-		tempTrader, createErr = trader.NewAsterTrader(
+		tempTrader, createErr = aster.NewAsterTrader(
 			exchangeCfg.AsterUser,
 			exchangeCfg.AsterSigner,
 			string(exchangeCfg.AsterPrivateKey),
 		)
 	case "bybit":
-		tempTrader = trader.NewBybitTrader(
+		tempTrader = bybit.NewBybitTrader(
 			string(exchangeCfg.APIKey),
 			string(exchangeCfg.SecretKey),
 		)
 	case "okx":
-		tempTrader = trader.NewOKXTrader(
+		tempTrader = okx.NewOKXTrader(
 			string(exchangeCfg.APIKey),
 			string(exchangeCfg.SecretKey),
 			string(exchangeCfg.Passphrase),
 		)
 	case "bitget":
-		tempTrader = trader.NewBitgetTrader(
+		tempTrader = bitget.NewBitgetTrader(
+			string(exchangeCfg.APIKey),
+			string(exchangeCfg.SecretKey),
+			string(exchangeCfg.Passphrase),
+		)
+	case "gate":
+		tempTrader = gate.NewGateTrader(
+			string(exchangeCfg.APIKey),
+			string(exchangeCfg.SecretKey),
+		)
+	case "kucoin":
+		tempTrader = kucoin.NewKuCoinTrader(
 			string(exchangeCfg.APIKey),
 			string(exchangeCfg.SecretKey),
 			string(exchangeCfg.Passphrase),
@@ -1310,7 +1374,7 @@ func (s *Server) handleClosePosition(c *gin.Context) {
 	case "lighter":
 		if exchangeCfg.LighterWalletAddr != "" && string(exchangeCfg.LighterAPIKeyPrivateKey) != "" {
 			// Lighter only supports mainnet
-			tempTrader, createErr = trader.NewLighterTraderV2(
+			tempTrader, createErr = lighter.NewLighterTraderV2(
 				exchangeCfg.LighterWalletAddr,
 				string(exchangeCfg.LighterAPIKeyPrivateKey),
 				exchangeCfg.LighterAPIKeyIndex,
@@ -1368,7 +1432,7 @@ func (s *Server) handleClosePosition(c *gin.Context) {
 
 	if closeErr != nil {
 		logger.Infof("❌ Close position failed: symbol=%s, side=%s, error=%v", req.Symbol, req.Side, closeErr)
-		SafeInternalError(c, "Failed to close position", closeErr)
+		SafeInternalError(c, "Close position", closeErr)
 		return
 	}
 
@@ -1389,7 +1453,7 @@ func (s *Server) handleClosePosition(c *gin.Context) {
 func (s *Server) recordClosePositionOrder(traderID, exchangeID, exchangeType, symbol, side string, quantity, exitPrice float64, result map[string]interface{}) {
 	// Skip for exchanges with OrderSync - let the background sync handle it to avoid duplicates
 	switch exchangeType {
-	case "binance", "lighter", "hyperliquid", "bybit", "okx", "bitget", "aster":
+	case "binance", "lighter", "hyperliquid", "bybit", "okx", "bitget", "aster", "gate":
 		logger.Infof("  📝 Close order will be synced by OrderSync, skipping immediate record")
 		return
 	}
@@ -1452,9 +1516,9 @@ func (s *Server) recordClosePositionOrder(traderID, exchangeID, exchangeType, sy
 		FilledQuantity:  quantity,
 		AvgFillPrice:    exitPrice,
 		Commission:      fee,
-		FilledAt:        time.Now().UTC(),
-		CreatedAt:       time.Now().UTC(),
-		UpdatedAt:       time.Now().UTC(),
+		FilledAt:        time.Now().UTC().UnixMilli(),
+		CreatedAt:       time.Now().UTC().UnixMilli(),
+		UpdatedAt:       time.Now().UTC().UnixMilli(),
 	}
 
 	if err := s.store.Order().CreateOrder(orderRecord); err != nil {
@@ -1482,7 +1546,7 @@ func (s *Server) recordClosePositionOrder(traderID, exchangeID, exchangeType, sy
 		CommissionAsset: "USDT",
 		RealizedPnL:     0,
 		IsMaker:         false,
-		CreatedAt:       time.Now().UTC(),
+		CreatedAt:       time.Now().UTC().UnixMilli(),
 	}
 
 	if err := s.store.Order().CreateFill(fillRecord); err != nil {
@@ -1557,7 +1621,7 @@ func (s *Server) pollAndUpdateOrderStatus(orderRecordID int64, traderID, exchang
 					CommissionAsset: "USDT",
 					RealizedPnL:     0,
 					IsMaker:         false,
-					CreatedAt:       time.Now().UTC(),
+					CreatedAt:       time.Now().UTC().UnixMilli(),
 				}
 
 				if err := s.store.Order().CreateFill(fillRecord); err != nil {
@@ -1704,13 +1768,26 @@ func (s *Server) handleUpdateModelConfigs(c *gin.Context) {
 		logger.Infof("🔓 Decrypted model config data (UserID: %s)", userID)
 	}
 
-	// Update each model's configuration
+	// Update each model's configuration and track traders that need reload
+	tradersToReload := make(map[string]bool)
 	for modelID, modelData := range req.Models {
+		// Find traders using this AI model BEFORE updating
+		traders, _ := s.store.Trader().ListByAIModelID(userID, modelID)
+		for _, t := range traders {
+			tradersToReload[t.ID] = true
+		}
+
 		err := s.store.AIModel().Update(userID, modelID, modelData.Enabled, modelData.APIKey, modelData.CustomAPIURL, modelData.CustomModelName)
 		if err != nil {
 			SafeInternalError(c, fmt.Sprintf("Update model %s", modelID), err)
 			return
 		}
+	}
+
+	// Remove affected traders from memory BEFORE reloading to pick up new config
+	for traderID := range tradersToReload {
+		logger.Infof("🔄 Removing trader %s from memory to reload with new AI model config", traderID)
+		s.traderManager.RemoveTrader(traderID)
 	}
 
 	// Reload all traders for this user to make new config take effect immediately
@@ -1824,13 +1901,26 @@ func (s *Server) handleUpdateExchangeConfigs(c *gin.Context) {
 		logger.Infof("🔓 Decrypted exchange config data (UserID: %s)", userID)
 	}
 
-	// Update each exchange's configuration
+	// Update each exchange's configuration and track traders that need reload
+	tradersToReload := make(map[string]bool)
 	for exchangeID, exchangeData := range req.Exchanges {
-		err := s.store.Exchange().Update(userID, exchangeID, exchangeData.Enabled, exchangeData.APIKey, exchangeData.SecretKey, exchangeData.Passphrase, exchangeData.Testnet, exchangeData.HyperliquidWalletAddr, exchangeData.AsterUser, exchangeData.AsterSigner, exchangeData.AsterPrivateKey, exchangeData.LighterWalletAddr, exchangeData.LighterPrivateKey, exchangeData.LighterAPIKeyPrivateKey, exchangeData.LighterAPIKeyIndex)
+		// Find traders using this exchange BEFORE updating
+		traders, _ := s.store.Trader().ListByExchangeID(userID, exchangeID)
+		for _, t := range traders {
+			tradersToReload[t.ID] = true
+		}
+
+		err := s.store.Exchange().Update(userID, exchangeID, exchangeData.Enabled, exchangeData.APIKey, exchangeData.SecretKey, exchangeData.Passphrase, exchangeData.Testnet, exchangeData.HyperliquidWalletAddr, exchangeData.HyperliquidUnifiedAcct, exchangeData.AsterUser, exchangeData.AsterSigner, exchangeData.AsterPrivateKey, exchangeData.LighterWalletAddr, exchangeData.LighterPrivateKey, exchangeData.LighterAPIKeyPrivateKey, exchangeData.LighterAPIKeyIndex)
 		if err != nil {
 			SafeInternalError(c, fmt.Sprintf("Update exchange %s", exchangeID), err)
 			return
 		}
+	}
+
+	// Remove affected traders from memory BEFORE reloading to pick up new config
+	for traderID := range tradersToReload {
+		logger.Infof("🔄 Removing trader %s from memory to reload with new exchange config", traderID)
+		s.traderManager.RemoveTrader(traderID)
 	}
 
 	// Reload all traders for this user to make new config take effect immediately
@@ -1854,6 +1944,7 @@ type CreateExchangeRequest struct {
 	Passphrase              string `json:"passphrase"`
 	Testnet                 bool   `json:"testnet"`
 	HyperliquidWalletAddr   string `json:"hyperliquid_wallet_addr"`
+	HyperliquidUnifiedAcct  bool   `json:"hyperliquid_unified_account"` // Unified Account mode: Spot as Perp collateral
 	AsterUser               string `json:"aster_user"`
 	AsterSigner             string `json:"aster_signer"`
 	AsterPrivateKey         string `json:"aster_private_key"`
@@ -1917,7 +2008,7 @@ func (s *Server) handleCreateExchange(c *gin.Context) {
 	// Validate exchange type
 	validTypes := map[string]bool{
 		"binance": true, "bybit": true, "okx": true, "bitget": true,
-		"hyperliquid": true, "aster": true, "lighter": true,
+		"hyperliquid": true, "aster": true, "lighter": true, "gate": true, "kucoin": true,
 	}
 	if !validTypes[req.ExchangeType] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid exchange type: %s", req.ExchangeType)})
@@ -1928,7 +2019,8 @@ func (s *Server) handleCreateExchange(c *gin.Context) {
 	id, err := s.store.Exchange().Create(
 		userID, req.ExchangeType, req.AccountName, req.Enabled,
 		req.APIKey, req.SecretKey, req.Passphrase, req.Testnet,
-		req.HyperliquidWalletAddr, req.AsterUser, req.AsterSigner, req.AsterPrivateKey,
+		req.HyperliquidWalletAddr, req.HyperliquidUnifiedAcct,
+		req.AsterUser, req.AsterSigner, req.AsterPrivateKey,
 		req.LighterWalletAddr, req.LighterPrivateKey, req.LighterAPIKeyPrivateKey, req.LighterAPIKeyIndex,
 	)
 	if err != nil {
@@ -2294,28 +2386,14 @@ func (s *Server) handleOrders(c *gin.Context) {
 		return
 	}
 
-	// Get all orders for this trader
-	allOrders, err := store.Order().GetTraderOrders(trader.GetID(), limit)
+	// Get orders with filters applied at database level
+	orders, err := store.Order().GetTraderOrdersFiltered(trader.GetID(), symbol, statusFilter, limit)
 	if err != nil {
 		SafeInternalError(c, "Get orders", err)
 		return
 	}
 
-	// Filter by symbol and status if specified
-	result := make([]interface{}, 0)
-	for _, order := range allOrders {
-		// Filter by symbol
-		if symbol != "" && order.Symbol != symbol {
-			continue
-		}
-		// Filter by status
-		if statusFilter != "" && order.Status != statusFilter {
-			continue
-		}
-		result = append(result, order)
-	}
-
-	c.JSON(http.StatusOK, result)
+	c.JSON(http.StatusOK, orders)
 }
 
 // handleOrderFills Order fill details (all fills for a specific order)
@@ -2353,6 +2431,40 @@ func (s *Server) handleOrderFills(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, fills)
+}
+
+// handleOpenOrders Get open orders (pending SL/TP) from exchange
+func (s *Server) handleOpenOrders(c *gin.Context) {
+	_, traderID, err := s.getTraderFromQuery(c)
+	if err != nil {
+		SafeBadRequest(c, "Invalid trader ID")
+		return
+	}
+
+	trader, err := s.traderManager.GetTrader(traderID)
+	if err != nil {
+		SafeNotFound(c, "Trader")
+		return
+	}
+
+	// Get symbol parameter (required for exchange query)
+	symbol := c.Query("symbol")
+	if symbol == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "symbol parameter is required"})
+		return
+	}
+
+	// Normalize symbol
+	symbol = market.Normalize(symbol)
+
+	// Get open orders from exchange
+	openOrders, err := trader.GetOpenOrders(symbol)
+	if err != nil {
+		SafeInternalError(c, "Get open orders", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, openOrders)
 }
 
 // handleKlines K-line data (supports multiple exchanges via coinank)
@@ -2429,10 +2541,15 @@ func (s *Server) getKlinesFromCoinank(symbol, interval, exchange string, limit i
 		coinankExchange = coinank_enum.Okex
 	case "bitget":
 		coinankExchange = coinank_enum.Bitget
+	case "gate":
+		coinankExchange = coinank_enum.Gate
 	case "aster":
 		coinankExchange = coinank_enum.Aster
 	case "lighter":
 		// Lighter doesn't have direct CoinAnk support, use Binance data as fallback
+		coinankExchange = coinank_enum.Binance
+	case "kucoin":
+		// KuCoin doesn't have direct CoinAnk support, use Binance data as fallback
 		coinankExchange = coinank_enum.Binance
 	default:
 		// For any unknown exchange, default to Binance
@@ -2968,7 +3085,44 @@ func (s *Server) handleRegister(c *gin.Context) {
 		return
 	}
 
-	// Check max users limit
+	var req struct {
+		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required,min=6"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		SafeBadRequest(c, "Invalid request parameters")
+		return
+	}
+
+	// Check if email already exists (must check before maxUsers to allow incomplete OTP users)
+	existingUser, err := s.store.User().GetByEmail(req.Email)
+	if err == nil {
+		// User exists, check OTP verification status
+		if !existingUser.OTPVerified {
+			// OTP not verified, verify password first for security
+			if !auth.CheckPassword(req.Password, existingUser.PasswordHash) {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Email or password incorrect"})
+				return
+			}
+			// Password correct, allow user to continue OTP setup
+			// Return existing OTP information
+			qrCodeURL := auth.GetOTPQRCodeURL(existingUser.OTPSecret, req.Email)
+			c.JSON(http.StatusOK, gin.H{
+				"user_id":     existingUser.ID,
+				"email":       existingUser.Email,
+				"otp_secret":  existingUser.OTPSecret,
+				"qr_code_url": qrCodeURL,
+				"message":     "Incomplete registration detected, please continue OTP setup",
+			})
+			return
+		}
+		// OTP already verified, reject duplicate registration
+		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+		return
+	}
+
+	// Check max users limit (only for new users)
 	maxUsers := config.Get().MaxUsers
 	if maxUsers > 0 {
 		userCount, err := s.store.User().Count()
@@ -2980,23 +3134,6 @@ func (s *Server) handleRegister(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Not on whitelist"})
 			return
 		}
-	}
-
-	var req struct {
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required,min=6"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		SafeBadRequest(c, "Invalid request parameters")
-		return
-	}
-
-	// Check if email already exists
-	_, err := s.store.User().GetByEmail(req.Email)
-	if err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
-		return
 	}
 
 	// Generate password hash
@@ -3120,10 +3257,15 @@ func (s *Server) handleLogin(c *gin.Context) {
 
 	// Check if OTP is verified
 	if !user.OTPVerified {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error":              "Account has not completed OTP setup",
+		// Return OTP info so user can complete setup
+		qrCodeURL := auth.GetOTPQRCodeURL(user.OTPSecret, user.Email)
+		c.JSON(http.StatusOK, gin.H{
 			"user_id":            user.ID,
+			"email":              user.Email,
+			"otp_secret":         user.OTPSecret,
+			"qr_code_url":        qrCodeURL,
 			"requires_otp_setup": true,
+			"message":            "Please complete OTP setup first",
 		})
 		return
 	}
@@ -3236,7 +3378,7 @@ func (s *Server) handleGetSupportedModels(c *gin.Context) {
 		{"id": "deepseek", "name": "DeepSeek", "provider": "deepseek", "defaultModel": "deepseek-chat"},
 		{"id": "qwen", "name": "Qwen", "provider": "qwen", "defaultModel": "qwen3-max"},
 		{"id": "openai", "name": "OpenAI", "provider": "openai", "defaultModel": "gpt-5.1"},
-		{"id": "claude", "name": "Claude", "provider": "claude", "defaultModel": "claude-opus-4-5-20251101"},
+		{"id": "claude", "name": "Claude", "provider": "claude", "defaultModel": "claude-opus-4-6"},
 		{"id": "gemini", "name": "Google Gemini", "provider": "gemini", "defaultModel": "gemini-3-pro-preview"},
 		{"id": "grok", "name": "Grok (xAI)", "provider": "grok", "defaultModel": "grok-3-latest"},
 		{"id": "kimi", "name": "Kimi (Moonshot)", "provider": "kimi", "defaultModel": "moonshot-v1-auto"},
@@ -3253,6 +3395,8 @@ func (s *Server) handleGetSupportedExchanges(c *gin.Context) {
 		{ExchangeType: "binance", Name: "Binance Futures", Type: "cex"},
 		{ExchangeType: "bybit", Name: "Bybit Futures", Type: "cex"},
 		{ExchangeType: "okx", Name: "OKX Futures", Type: "cex"},
+		{ExchangeType: "gate", Name: "Gate.io Futures", Type: "cex"},
+		{ExchangeType: "kucoin", Name: "KuCoin Futures", Type: "cex"},
 		{ExchangeType: "hyperliquid", Name: "Hyperliquid", Type: "dex"},
 		{ExchangeType: "aster", Name: "Aster DEX", Type: "dex"},
 		{ExchangeType: "lighter", Name: "LIGHTER DEX", Type: "dex"},

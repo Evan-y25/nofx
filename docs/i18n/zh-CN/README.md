@@ -1,9 +1,21 @@
-# NOFX - AI 交易系统
+<h1 align="center">NOFX — 开源 AI 交易操作系统</h1>
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
-[![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat&logo=react)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=flat&logo=typescript)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+<p align="center">
+  <strong>AI 驱动金融交易的基础设施层</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/NoFxAiOS/nofx/stargazers"><img src="https://img.shields.io/github/stars/NoFxAiOS/nofx?style=for-the-badge" alt="Stars"></a>
+  <a href="https://github.com/NoFxAiOS/nofx/releases"><img src="https://img.shields.io/github/v/release/NoFxAiOS/nofx?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/NoFxAiOS/nofx/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=for-the-badge" alt="License"></a>
+  <a href="https://t.me/nofx_dev_community"><img src="https://img.shields.io/badge/Telegram-Community-blue?style=for-the-badge&logo=telegram" alt="Telegram"></a>
+</p>
+
+<p align="center">
+  <a href="https://golang.org/"><img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go" alt="Go"></a>
+  <a href="https://reactjs.org/"><img src="https://img.shields.io/badge/React-18+-61DAFB?style=flat&logo=react" alt="React"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=flat&logo=typescript" alt="TypeScript"></a>
+</p>
 
 > **语言声明：** 本中文版本文档仅为方便海外华人社区阅读而提供，不代表本软件面向中国大陆、香港、澳门或台湾地区用户开放。如您位于上述地区，请勿使用本软件。
 
@@ -16,14 +28,10 @@
 
 ---
 
-## AI 驱动的加密货币交易平台
-
-**NOFX** 是一个开源的 AI 交易系统，让你可以运行多个 AI 模型自动交易加密货币期货。通过 Web 界面配置策略，实时监控表现，让多个 AI 代理竞争找出最佳交易方案。
-
 ### 核心功能
 
 - **多 AI 支持**: 运行 DeepSeek、通义千问、GPT、Claude、Gemini、Grok、Kimi - 随时切换模型
-- **多交易所**: 在 Binance、Bybit、OKX、Hyperliquid、Aster DEX、Lighter 统一交易
+- **多交易所**: 在 Binance、Bybit、OKX、Bitget、KuCoin、Gate、Hyperliquid、Aster DEX、Lighter 统一交易
 - **策略工作室**: 可视化策略构建器，配置币种来源、指标和风控参数
 - **AI 竞赛模式**: 多个 AI 交易员实时竞争，并排追踪表现
 - **Web 配置**: 无需编辑 JSON - 通过 Web 界面完成所有配置
@@ -34,6 +42,12 @@
 - **Tinkle** - [@Web3Tinkle](https://x.com/Web3Tinkle)
 - **官方 Twitter** - [@nofx_official](https://x.com/nofx_official)
 
+### 官方链接
+
+- **官网**: [https://nofxai.com](https://nofxai.com)
+- **数据站点**: [https://nofxos.ai/dashboard](https://nofxos.ai/dashboard)
+- **API 文档**: [https://nofxos.ai/api-docs](https://nofxos.ai/api-docs)
+
 > **风险提示**: 本系统为实验性质。AI 自动交易存在重大风险。强烈建议仅用于学习/研究目的或小额测试！
 
 ## 开发者社区
@@ -42,19 +56,12 @@
 
 ---
 
-## 截图
+## 开始之前
 
-### 竞赛模式 - 实时 AI 对战
-![竞赛页面](../../../screenshots/competition-page.png)
-*多 AI 排行榜，实时性能对比*
+使用 NOFX 你需要准备:
 
-### 仪表板 - 市场图表视图
-![仪表板市场图表](../../../screenshots/dashboard-market-chart.png)
-*专业交易仪表板，TradingView 风格图表*
-
-### 策略工作室
-![策略工作室](../../../screenshots/strategy-studio.png)
-*多数据源策略配置与 AI 测试*
+1. **交易所账户** - 在任意支持的交易所注册并创建具有交易权限的 API 凭证
+2. **AI 模型 API Key** - 从任意支持的提供商获取（推荐 DeepSeek，性价比最高）
 
 ---
 
@@ -67,6 +74,9 @@
 | **Binance** | ✅ 已支持 | [注册](https://www.binance.com/join?ref=NOFXENG) |
 | **Bybit** | ✅ 已支持 | [注册](https://partner.bybit.com/b/83856) |
 | **OKX** | ✅ 已支持 | [注册](https://www.okx.com/join/1865360) |
+| **Bitget** | ✅ 已支持 | [注册](https://www.bitget.com/referral/register?from=referral&clacCode=c8a43172) |
+| **KuCoin** | ✅ 已支持 | [注册](https://www.kucoin.com/r/broker/CXEV7XKK) |
+| **Gate** | ✅ 已支持 | [注册](https://www.gatenode.xyz/share/VQBGUAxY) |
 
 ### Perp-DEX (去中心化永续交易所)
 
@@ -92,9 +102,25 @@
 
 ---
 
+## 截图
+
+### 竞赛模式 - 实时 AI 对战
+![竞赛页面](../../../screenshots/competition-page.png)
+*多 AI 排行榜，实时性能对比*
+
+### 仪表板 - 市场图表视图
+![仪表板市场图表](../../../screenshots/dashboard-market-chart.png)
+*专业交易仪表板，TradingView 风格图表*
+
+### 策略工作室
+![策略工作室](../../../screenshots/strategy-studio.png)
+*多数据源策略配置与 AI 测试*
+
+---
+
 ## 快速开始
 
-### 一键安装 (推荐)
+### 一键安装 (本地/服务器)
 
 **Linux / macOS:**
 ```bash
@@ -102,6 +128,14 @@ curl -fsSL https://raw.githubusercontent.com/NoFxAiOS/nofx/main/install.sh | bas
 ```
 
 完成！打开浏览器访问 **http://127.0.0.1:3000**
+
+### 一键云部署 (Railway)
+
+一键部署到 Railway - 无需自己搭建服务器：
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/nofx?referralCode=nofx)
+
+部署后，Railway 会提供一个公网 URL 访问你的 NOFX 实例。
 
 ### Docker Compose (手动)
 

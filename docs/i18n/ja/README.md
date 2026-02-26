@@ -1,32 +1,92 @@
-# NOFX - AI トレーディングシステム
+<h1 align="center">NOFX — オープンソース AI トレーディング OS</h1>
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
-[![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat&logo=react)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=flat&logo=typescript)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+<p align="center">
+  <strong>AI 駆動金融取引のインフラストラクチャレイヤー</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/NoFxAiOS/nofx/stargazers"><img src="https://img.shields.io/github/stars/NoFxAiOS/nofx?style=for-the-badge" alt="Stars"></a>
+  <a href="https://github.com/NoFxAiOS/nofx/releases"><img src="https://img.shields.io/github/v/release/NoFxAiOS/nofx?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/NoFxAiOS/nofx/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=for-the-badge" alt="License"></a>
+  <a href="https://t.me/nofx_dev_community"><img src="https://img.shields.io/badge/Telegram-Community-blue?style=for-the-badge&logo=telegram" alt="Telegram"></a>
+</p>
+
+<p align="center">
+  <a href="https://golang.org/"><img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go" alt="Go"></a>
+  <a href="https://reactjs.org/"><img src="https://img.shields.io/badge/React-18+-61DAFB?style=flat&logo=react" alt="React"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=flat&logo=typescript" alt="TypeScript"></a>
+</p>
 
 **言語:** [English](../../../README.md) | [中文](../zh-CN/README.md) | [日本語](README.md)
 
 ---
 
-## AI 駆動の暗号通貨取引プラットフォーム
-
-**NOFX** は、複数の AI モデルを使用して暗号通貨先物を自動取引できるオープンソースの AI 取引システムです。Web インターフェースで戦略を設定し、リアルタイムでパフォーマンスを監視し、AI エージェントを競わせて最適な取引アプローチを見つけます。
-
 ### コア機能
 
 - **マルチ AI サポート**: DeepSeek、Qwen、GPT、Claude、Gemini、Grok、Kimi を実行 - いつでもモデルを切り替え可能
-- **マルチ取引所**: Binance、Bybit、OKX、Hyperliquid、Aster DEX、Lighter で統一取引
+- **マルチ取引所**: Binance、Bybit、OKX、Bitget、KuCoin、Gate、Hyperliquid、Aster DEX、Lighter で統一取引
 - **ストラテジースタジオ**: コインソース、インジケーター、リスク管理を設定するビジュアル戦略ビルダー
 - **AI 競争モード**: 複数の AI トレーダーがリアルタイムで競争、パフォーマンスを並べて追跡
 - **Web ベース設定**: JSON 編集不要 - Web インターフェースですべて設定
 - **リアルタイムダッシュボード**: ライブポジション、損益追跡、思考連鎖付き AI 決定ログ
+
+### 公式リンク
+
+- **公式サイト**: [https://nofxai.com](https://nofxai.com)
+- **データダッシュボード**: [https://nofxos.ai/dashboard](https://nofxos.ai/dashboard)
+- **API ドキュメント**: [https://nofxos.ai/api-docs](https://nofxos.ai/api-docs)
 
 > **リスク警告**: このシステムは実験的です。AI 自動取引には重大なリスクがあります。学習/研究目的または少額でのテストのみを強くお勧めします！
 
 ## 開発者コミュニティ
 
 Telegram 開発者コミュニティに参加: **[NOFX 開発者コミュニティ](https://t.me/nofx_dev_community)**
+
+---
+
+## 始める前に
+
+NOFXを使用するには以下が必要です:
+
+1. **取引所アカウント** - サポートされている取引所に登録し、取引権限付きのAPI認証情報を作成
+2. **AI モデル API キー** - サポートされているプロバイダーから取得（コスト効率の良いDeepSeekを推奨）
+
+---
+
+## サポート取引所
+
+### CEX (中央集権型取引所)
+
+| 取引所 | ステータス | 登録 (手数料割引) |
+|----------|--------|-------------------------|
+| **Binance** | ✅ サポート | [登録](https://www.binance.com/join?ref=NOFXENG) |
+| **Bybit** | ✅ サポート | [登録](https://partner.bybit.com/b/83856) |
+| **OKX** | ✅ サポート | [登録](https://www.okx.com/join/1865360) |
+| **Bitget** | ✅ サポート | [登録](https://www.bitget.com/referral/register?from=referral&clacCode=c8a43172) |
+| **KuCoin** | ✅ サポート | [登録](https://www.kucoin.com/r/broker/CXEV7XKK) |
+| **Gate** | ✅ サポート | [登録](https://www.gatenode.xyz/share/VQBGUAxY) |
+
+### Perp-DEX (分散型永久先物取引所)
+
+| 取引所 | ステータス | 登録 (手数料割引) |
+|----------|--------|-------------------------|
+| **Hyperliquid** | ✅ サポート | [登録](https://app.hyperliquid.xyz/join/AITRADING) |
+| **Aster DEX** | ✅ サポート | [登録](https://www.asterdex.com/en/referral/fdfc0e) |
+| **Lighter** | ✅ サポート | [登録](https://app.lighter.xyz/?referral=68151432) |
+
+---
+
+## サポート AI モデル
+
+| AI モデル | ステータス | API キー取得 |
+|----------|--------|-------------|
+| **DeepSeek** | ✅ サポート | [API キー取得](https://platform.deepseek.com) |
+| **Qwen** | ✅ サポート | [API キー取得](https://dashscope.console.aliyun.com) |
+| **OpenAI (GPT)** | ✅ サポート | [API キー取得](https://platform.openai.com) |
+| **Claude** | ✅ サポート | [API キー取得](https://console.anthropic.com) |
+| **Gemini** | ✅ サポート | [API キー取得](https://aistudio.google.com) |
+| **Grok** | ✅ サポート | [API キー取得](https://console.x.ai) |
+| **Kimi** | ✅ サポート | [API キー取得](https://platform.moonshot.cn) |
 
 ---
 
